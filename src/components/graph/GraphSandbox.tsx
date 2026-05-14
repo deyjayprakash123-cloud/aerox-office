@@ -129,7 +129,7 @@ export default function GraphSandbox() {
   ];
   const SAMPLE_HEADERS = ['Revenue', 'Expenses', 'Profit'];
 
-  const displayData = hasData ? series.data : SAMPLE;
+  const displayData: { name: string; [key: string]: any }[] = hasData ? series.data : SAMPLE;
   const displayHeaders = hasData ? headers : SAMPLE_HEADERS;
 
   const modes: { id: ChartMode; icon: any; label: string }[] = [
@@ -268,7 +268,7 @@ export default function GraphSandbox() {
               innerRadius="40%"
               paddingAngle={3}
               label={({ name, percent }) =>
-                `${name} ${(percent * 100).toFixed(1)}%`
+                `${name} ${((percent ?? 0) * 100).toFixed(1)}%`
               }
               labelLine={{ stroke: 'rgba(255,255,255,0.2)' }}
             >

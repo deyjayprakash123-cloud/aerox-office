@@ -11,7 +11,7 @@ function WindowContainer({ windowData, children }: { windowData: any, children: 
   const updateWindow = useStore((state) => state.updateWindow);
   const closeWindow = useStore((state) => state.closeWindow);
   const setActiveWindow = useStore((state) => state.setActiveWindow);
-  const activeWindow = useStore((state) => state.activeWindow);
+  const activeWindow = useStore((state) => state.activeWindowId);
 
   const [position, setPosition] = useState({ x, y });
   const isActive = activeWindow === id;

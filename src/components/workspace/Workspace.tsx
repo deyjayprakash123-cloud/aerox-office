@@ -3,23 +3,29 @@
 import { useStore } from '@/store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Maximize2, Minus, ChevronDown } from 'lucide-react';
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
 const SpreadsheetGrid = dynamic(() => import('@/components/spreadsheet/SpreadsheetGrid'), { ssr: false });
-const GraphSandbox = dynamic(() => import('@/components/graph/GraphSandbox'), { ssr: false });
-const ProConverter = dynamic(() => import('@/components/converter/ProConverter'), { ssr: false });
+const GraphSandbox    = dynamic(() => import('@/components/graph/GraphSandbox'),          { ssr: false });
+const ProConverter    = dynamic(() => import('@/components/converter/ProConverter'),       { ssr: false });
+const FileCompressor  = dynamic(() => import('@/components/converter/FileCompressor'),    { ssr: false });
+const PdfMaker        = dynamic(() => import('@/components/converter/PdfMaker'),          { ssr: false });
 
-const WINDOW_CONTENT: Record<string, React.FC> = {
+const WINDOW_CONTENT: Record<string, React.ComponentType<{}>> = {
   spreadsheet: SpreadsheetGrid,
-  graph: GraphSandbox,
-  converter: ProConverter,
+  graph:       GraphSandbox,
+  converter:   ProConverter,
+  compressor:  FileCompressor,
+  pdfmaker:    PdfMaker,
 };
 
 const TYPE_COLOR: Record<string, string> = {
   spreadsheet: '#00F2FF',
-  graph: '#7000FF',
-  converter: '#FF6B6B',
+  graph:       '#7000FF',
+  converter:   '#FF6B6B',
+  compressor:  '#FF9A6B',
+  pdfmaker:    '#FFD166',
 };
 
 function WindowFrame({ win }: { win: any }) {
