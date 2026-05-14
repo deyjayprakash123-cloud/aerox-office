@@ -1,0 +1,46 @@
+{
+  "name": "aerox-office",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@react-three/drei": "^9.105.6",
+    "@react-three/fiber": "^8.15.12",
+    "@tanstack/react-table": "^8.21.3",
+    "@types/react-window": "^1.8.8",
+    "docx": "^9.6.1",
+    "framer-motion": "^12.38.0",
+    "hyperformula": "^3.2.0",
+    "lucide-react": "^1.14.0",
+    "next": "14.2.3",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.7.284",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-virtualized-auto-sizer": "^2.0.3",
+    "react-window": "^2.2.7",
+    "recharts": "^3.8.1",
+    "three": "^0.184.0",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.3",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5"
+  }
+}
