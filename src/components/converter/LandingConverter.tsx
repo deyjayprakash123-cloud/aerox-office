@@ -105,7 +105,6 @@ async function convertPdfToDocx(file: File, onProgress: (p: Progress) => void): 
 
   // Offscreen canvas reused for every page render
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d')!;
 
   // Target render width in pixels — high enough to look sharp in the DOCX
   const RENDER_SCALE = 2.0; // 144 DPI (2× the default 72 DPI)
@@ -141,9 +140,10 @@ async function convertPdfToDocx(file: File, onProgress: (p: Progress) => void): 
     canvas.width  = viewport.width;
     canvas.height = viewport.height;
     // Clear to white before rendering (some PDFs have transparent background)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({ canvasContext: ctx as any, viewport }).promise;
+    const ctx2d = canvas.getContext('2d')!;
+    ctx2d.fillStyle = '#ffffff';
+    ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvas, viewport } as any).promise;
 
     // Convert canvas → base64 PNG
     const dataUrl = canvas.toDataURL('image/png');
