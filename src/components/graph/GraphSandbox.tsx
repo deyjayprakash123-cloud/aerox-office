@@ -112,7 +112,9 @@ function ModeBtn({
 }
 
 export default function GraphSandbox() {
-  const spreadsheetData = useStore((s) => s.spreadsheet.data);
+  const sheets        = useStore((s) => s.spreadsheet.sheets);
+  const activeSheetId = useStore((s) => s.spreadsheet.activeSheetId);
+  const spreadsheetData = sheets.find((sh) => sh.id === activeSheetId)?.data ?? [];
   const [chartMode, setChartMode] = useState<ChartMode>('bar');
 
   const { series, headers, hasData } = useMemo(
