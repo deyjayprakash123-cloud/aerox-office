@@ -94,17 +94,26 @@ async function convertPdfToDocx(file: File, onProgress: (p: Progress) => void): 
 
   // ── 1. Load PDF with PDF.js ───────────────────────────────────────────────
   const pdfjsLib = await import('pdfjs-dist');
-  // Point the worker at the bundled legacy worker (works in Next.js without extra config)
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
   const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
   const totalPages = pdfDoc.numPages;
 
-  // ── 2. Extract text page by page ─────────────────────────────────────────
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx');
+  // ── 2. Prepare docx builders ──────────────────────────────────────────────
+  // ImageRun allows embedding rasterised page snapshots (captures logos/graphics)
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } = await import('docx');
 
-  const children: InstanceType<typeof Paragraph>[] = [
-    // Cover heading
+  // Offscreen canvas reused for every page render
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+
+  // Target render width in pixels — high enough to look sharp in the DOCX
+  const RENDER_SCALE = 2.0; // 144 DPI (2× the default 72 DPI)
+
+  // DOCX page content width: A4 = ~595 pt → leave 2.5 cm margins → ~519 pt → in px for Word = 693 px
+  const DOCX_IMG_WIDTH_PX  = 693;
+
+  const children: any[] = [
     new Paragraph({
       text: file.name.replace(/\.pdf$/i, ''),
       heading: HeadingLevel.HEADING_1,
@@ -115,55 +124,92 @@ async function convertPdfToDocx(file: File, onProgress: (p: Progress) => void): 
         new TextRun({ text: '  ·  Converted by AEROX OFFICE', italics: true, color: '888888', break: 0 }),
       ],
     }),
-    new Paragraph({ text: '' }), // spacer
+    new Paragraph({ text: '' }),
   ];
 
+  // ── 3. Render + extract each page ────────────────────────────────────────
   for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
     onProgress({
-      percent: Math.round((pageNum / totalPages) * 90),
-      message: `Extracting page ${pageNum} of ${totalPages}…`,
+      percent: Math.round((pageNum / totalPages) * 88),
+      message: `Rendering page ${pageNum} of ${totalPages}…`,
     });
 
     const page = await pdfDoc.getPage(pageNum);
-    const content = await page.getTextContent();
+    const viewport = page.getViewport({ scale: RENDER_SCALE });
 
-    // Group items into lines by their vertical position (y coordinate)
-    const lineMap = new Map<number, string[]>();
-    for (const item of content.items as { str: string; transform: number[] }[]) {
-      // transform[5] is the Y baseline in PDF units
-      const y = Math.round(item.transform[5]);
-      if (!lineMap.has(y)) lineMap.set(y, []);
-      lineMap.get(y)!.push(item.str);
-    }
+    // --- Render page to canvas (captures text, logos, images, vectors) ---
+    canvas.width  = viewport.width;
+    canvas.height = viewport.height;
+    // Clear to white before rendering (some PDFs have transparent background)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx as any, viewport }).promise;
 
-    // Sort lines top-to-bottom (descending Y) and join
-    const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
-    const pageLines = sortedYs.map((y) => lineMap.get(y)!.join(' ').trim()).filter(Boolean);
+    // Convert canvas → base64 PNG
+    const dataUrl = canvas.toDataURL('image/png');
+    const base64  = dataUrl.split(',')[1]; // strip "data:image/png;base64,"
 
+    // Calculate the DOCX image height to maintain page aspect ratio
+    const aspectRatio  = viewport.height / viewport.width;
+    const imgWidthPx   = DOCX_IMG_WIDTH_PX;
+    const imgHeightPx  = Math.round(imgWidthPx * aspectRatio);
+
+    // --- Page separator ---
     if (totalPages > 1) {
       children.push(
         new Paragraph({
-          text: `— Page ${pageNum} —`,
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: `— Page ${pageNum} —`, bold: true, color: '555555', size: 20 })],
+          children: [new TextRun({ text: `— Page ${pageNum} —`, bold: true, color: '999999', size: 18 })],
         })
       );
     }
 
-    for (const line of pageLines) {
+    // --- Embed rendered page image (includes logos, graphics, everything) ---
+    children.push(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            data: base64,
+            transformation: { width: imgWidthPx, height: imgHeightPx },
+            type: 'png',
+          } as any),
+        ],
+      })
+    );
+
+    // --- Extract text content for searchability (rendered below in grey) ---
+    const content = await page.getTextContent();
+    const lineMap = new Map<number, string[]>();
+    for (const item of content.items as { str: string; transform: number[] }[]) {
+      const y = Math.round(item.transform[5] / RENDER_SCALE);
+      if (!lineMap.has(y)) lineMap.set(y, []);
+      lineMap.get(y)!.push(item.str);
+    }
+    const sortedYs  = Array.from(lineMap.keys()).sort((a, b) => b - a);
+    const pageLines = sortedYs.map((y) => lineMap.get(y)!.join(' ').trim()).filter(Boolean);
+
+    if (pageLines.length > 0) {
+      // Tiny invisible-ish text block — keeps the DOCX searchable & copy-pasteable
       children.push(
         new Paragraph({
-          children: [new TextRun({ text: line })],
+          children: [new TextRun({ text: '─── Searchable text ───', color: 'cccccc', size: 14 })],
         })
       );
+      for (const line of pageLines) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: line, color: 'aaaaaa', size: 14 })],
+          })
+        );
+      }
     }
 
-    children.push(new Paragraph({ text: '' })); // blank line between pages
+    children.push(new Paragraph({ text: '' })); // spacer between pages
   }
 
-  onProgress({ percent: 95, message: 'Building DOCX…' });
+  onProgress({ percent: 96, message: 'Building DOCX…' });
 
-  // ── 3. Pack into DOCX ────────────────────────────────────────────────────
+  // ── 4. Pack into DOCX ────────────────────────────────────────────────────
   const doc = new Document({
     sections: [{ children }],
   });
@@ -171,6 +217,7 @@ async function convertPdfToDocx(file: File, onProgress: (p: Progress) => void): 
   onProgress({ percent: 100, message: 'Done!' });
   return await Packer.toBlob(doc);
 }
+
 
 async function convertDocxToPdf(file: File, onProgress: (p: Progress) => void): Promise<Blob> {
   const buf = await file.arrayBuffer();
