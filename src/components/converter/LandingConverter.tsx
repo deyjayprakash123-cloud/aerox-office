@@ -91,21 +91,84 @@ async function simulateWorker(
 
 async function convertPdfToDocx(file: File, onProgress: (p: Progress) => void): Promise<Blob> {
   const buf = await file.arrayBuffer();
-  const estPages = Math.max(1, Math.min(Math.round(buf.byteLength / 4096), 500));
-  await simulateWorker(estPages, onProgress);
-  // Build a minimal DOCX with the filename as a placeholder paragraph
-  const { Document, Packer, Paragraph, TextRun } = await import('docx');
-  const doc = new Document({
-    sections: [{
+
+  // ── 1. Load PDF with PDF.js ───────────────────────────────────────────────
+  const pdfjsLib = await import('pdfjs-dist');
+  // Point the worker at the bundled legacy worker (works in Next.js without extra config)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+  const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const totalPages = pdfDoc.numPages;
+
+  // ── 2. Extract text page by page ─────────────────────────────────────────
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx');
+
+  const children: InstanceType<typeof Paragraph>[] = [
+    // Cover heading
+    new Paragraph({
+      text: file.name.replace(/\.pdf$/i, ''),
+      heading: HeadingLevel.HEADING_1,
+    }),
+    new Paragraph({
       children: [
-        new Paragraph({
-          children: [new TextRun({ text: `Converted from: ${file.name}`, bold: true })],
-        }),
-        new Paragraph({ children: [new TextRun({ text: `Pages processed: ${estPages}` })] }),
-        new Paragraph({ children: [new TextRun({ text: 'AEROX OFFICE — Client-Side Conversion', italics: true })] }),
+        new TextRun({ text: `Source: ${file.name}`, italics: true, color: '888888' }),
+        new TextRun({ text: '  ·  Converted by AEROX OFFICE', italics: true, color: '888888', break: 0 }),
       ],
-    }],
+    }),
+    new Paragraph({ text: '' }), // spacer
+  ];
+
+  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    onProgress({
+      percent: Math.round((pageNum / totalPages) * 90),
+      message: `Extracting page ${pageNum} of ${totalPages}…`,
+    });
+
+    const page = await pdfDoc.getPage(pageNum);
+    const content = await page.getTextContent();
+
+    // Group items into lines by their vertical position (y coordinate)
+    const lineMap = new Map<number, string[]>();
+    for (const item of content.items as { str: string; transform: number[] }[]) {
+      // transform[5] is the Y baseline in PDF units
+      const y = Math.round(item.transform[5]);
+      if (!lineMap.has(y)) lineMap.set(y, []);
+      lineMap.get(y)!.push(item.str);
+    }
+
+    // Sort lines top-to-bottom (descending Y) and join
+    const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
+    const pageLines = sortedYs.map((y) => lineMap.get(y)!.join(' ').trim()).filter(Boolean);
+
+    if (totalPages > 1) {
+      children.push(
+        new Paragraph({
+          text: `— Page ${pageNum} —`,
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: `— Page ${pageNum} —`, bold: true, color: '555555', size: 20 })],
+        })
+      );
+    }
+
+    for (const line of pageLines) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: line })],
+        })
+      );
+    }
+
+    children.push(new Paragraph({ text: '' })); // blank line between pages
+  }
+
+  onProgress({ percent: 95, message: 'Building DOCX…' });
+
+  // ── 3. Pack into DOCX ────────────────────────────────────────────────────
+  const doc = new Document({
+    sections: [{ children }],
   });
+
+  onProgress({ percent: 100, message: 'Done!' });
   return await Packer.toBlob(doc);
 }
 

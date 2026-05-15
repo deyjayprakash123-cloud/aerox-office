@@ -23,6 +23,9 @@ import {
   X,
   CheckCheck,
   FileDown,
+  Plus,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -366,12 +369,120 @@ function ToolBtn({
 }
 
 // ── Main Spreadsheet ─────────────────────────────────────────────────────────
+// ── Sheet Tabs ────────────────────────────────────────────────────────────────
+function SheetTabs() {
+  const sheets        = useStore((s) => s.spreadsheet.sheets);
+  const activeSheetId = useStore((s) => s.spreadsheet.activeSheetId);
+  const addSheet      = useStore((s) => s.addSheet);
+  const clearSheet    = useStore((s) => s.clearSheet);
+  const switchSheet   = useStore((s) => s.switchSheet);
+  const deleteSheet   = useStore((s) => s.deleteSheet);
+  const renameSheet   = useStore((s) => s.renameSheet);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName]   = useState('');
+
+  const startRename = (id: string, name: string) => {
+    setEditingId(id);
+    setEditName(name);
+  };
+
+  const commitRename = (id: string) => {
+    if (editName.trim()) renameSheet(id, editName.trim());
+    setEditingId(null);
+  };
+
+  return (
+    <div className="flex items-center gap-0.5 px-2 py-1 bg-[#050510] border-t border-white/10 flex-shrink-0 overflow-x-auto">
+      {sheets.map((sheet) => {
+        const isActive = sheet.id === activeSheetId;
+        return (
+          <div
+            key={sheet.id}
+            onClick={() => switchSheet(sheet.id)}
+            className={`group relative flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg text-xs font-medium cursor-pointer transition-all duration-200 select-none flex-shrink-0 ${
+              isActive
+                ? 'bg-[#0a0a20] text-[#00F2FF] border border-[#00F2FF]/30 border-b-transparent'
+                : 'text-white/40 hover:text-white/70 hover:bg-white/5 border border-transparent'
+            }`}
+            style={isActive ? { boxShadow: '0 0 12px rgba(0,242,255,0.15)' } : {}}
+          >
+            {/* Sheet name / rename input */}
+            {editingId === sheet.id ? (
+              <input
+                autoFocus
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onBlur={() => commitRename(sheet.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitRename(sheet.id);
+                  if (e.key === 'Escape') setEditingId(null);
+                  e.stopPropagation();
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-transparent text-[#00F2FF] outline-none w-20 text-xs font-medium"
+              />
+            ) : (
+              <span onDoubleClick={(e) => { e.stopPropagation(); startRename(sheet.id, sheet.name); }}>
+                {sheet.name}
+              </span>
+            )}
+
+            {/* Per-tab controls — only visible when tab is active */}
+            {isActive && (
+              <div className="flex items-center gap-0.5 ml-1">
+                {/* Clear sheet */}
+                <button
+                  title="Clear all data in this sheet"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Clear all data in "${sheet.name}"?`)) clearSheet(sheet.id);
+                  }}
+                  className="w-4 h-4 flex items-center justify-center rounded text-white/30 hover:text-amber-400 hover:bg-amber-400/10 transition-colors"
+                >
+                  <RotateCcw size={9} />
+                </button>
+
+                {/* Delete sheet (only if more than 1) */}
+                {sheets.length > 1 && (
+                  <button
+                    title="Delete this sheet"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete "${sheet.name}"? This cannot be undone.`)) deleteSheet(sheet.id);
+                    }}
+                    className="w-4 h-4 flex items-center justify-center rounded text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                  >
+                    <Trash2 size={9} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Add sheet button */}
+      <button
+        title="Add new sheet"
+        onClick={addSheet}
+        className="flex items-center justify-center w-7 h-7 ml-1 rounded-lg text-white/30 hover:text-[#00F2FF] hover:bg-[#00F2FF]/10 border border-transparent hover:border-[#00F2FF]/20 transition-all flex-shrink-0"
+      >
+        <Plus size={13} />
+      </button>
+    </div>
+  );
+}
+
+// ── Main Spreadsheet ─────────────────────────────────────────────────────────
 export default function SpreadsheetGrid() {
-  const spreadsheetData = useStore((s) => s.spreadsheet.data);
+  const sheets        = useStore((s) => s.spreadsheet.sheets);
+  const activeSheetId = useStore((s) => s.spreadsheet.activeSheetId);
+  const activeSheet   = sheets.find((s) => s.id === activeSheetId);
+  const spreadsheetData = activeSheet?.data ?? [] as CellValue[][];
   const selectedRange = useStore((s) => s.spreadsheet.selectedRange);
-  const setCellValue = useStore((s) => s.setCellValue);
+  const setCellValue  = useStore((s) => s.setCellValue);
   const setSelectedCell = useStore((s) => s.setSelectedCell);
-  const pasteRange = useStore((s) => s.pasteRange);
+  const pasteRange    = useStore((s) => s.pasteRange);
 
   const [pastePreview, setPastePreview] = useState<{ grid: CellValue[][]; startRow: number; startCol: number } | null>(null);
 
@@ -924,6 +1035,9 @@ export default function SpreadsheetGrid() {
             })()}
         </span>
       </div>
+
+      {/* Sheet Tabs */}
+      <SheetTabs />
     </div>
   );
 }
