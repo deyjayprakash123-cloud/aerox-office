@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-export type WindowType = 'spreadsheet' | 'graph' | 'converter' | 'compressor' | 'pdfmaker';
+export type WindowType = 'spreadsheet' | 'graph' | 'converter' | 'compressor' | 'pdfmaker' | 'wordmaker';
 
 export interface WindowItem {
   id: string;
@@ -15,6 +15,7 @@ export interface WindowItem {
   height: number;
   isOpen: boolean;
   isMinimized: boolean;
+  isMaximized?: boolean;
 }
 
 export type CellValue = string | number | null;
@@ -51,6 +52,7 @@ interface AeroxStore {
   updateWindow: (id: string, updates: Partial<WindowItem>) => void;
   closeWindow: (id: string) => void;
   minimizeWindow: (id: string) => void;
+  maximizeWindow: (id: string) => void;
   setActiveWindow: (id: string) => void;
 
   // Spreadsheet
@@ -75,6 +77,7 @@ const WINDOW_DEFAULTS: Record<WindowType, { title: string; width: number; height
   converter:   { title: 'Pro Converter',   width: 560, height: 620 },
   compressor:  { title: 'File Compressor', width: 560, height: 560 },
   pdfmaker:    { title: 'PDF Maker',       width: 680, height: 680 },
+  wordmaker:   { title: 'DocCraft',        width: 1020, height: 740 },
 };
 
 const defaultSheet = makeSheet('Sheet 1');
@@ -103,6 +106,7 @@ export const useStore = create<AeroxStore>()(
               height: defaults.height,
               isOpen: true,
               isMinimized: false,
+              isMaximized: false,
             },
           ],
           activeWindowId: id,
@@ -124,6 +128,13 @@ export const useStore = create<AeroxStore>()(
         set((state) => ({
           windows: state.windows.map((w) =>
             w.id === id ? { ...w, isMinimized: !w.isMinimized } : w
+          ),
+        })),
+
+      maximizeWindow: (id) =>
+        set((state) => ({
+          windows: state.windows.map((w) =>
+            w.id === id ? { ...w, isMaximized: !w.isMaximized } : w
           ),
         })),
 

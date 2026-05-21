@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Grid3X3, BarChart3, FileTerminal, Home, Archive, FileImage } from 'lucide-react';
+import { Grid3X3, BarChart3, FileTerminal, Home, Archive, FileImage, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useStore } from '@/store/useStore';
 import { useState } from 'react';
@@ -12,6 +12,7 @@ const ITEMS = [
   { type: 'converter'   as const, icon: FileTerminal, label: 'Pro Converter',  color: '#FF6B6B' },
   { type: 'compressor'  as const, icon: Archive,     label: 'File Compressor', color: '#FF9A6B' },
   { type: 'pdfmaker'    as const, icon: FileImage,   label: 'PDF Maker',       color: '#FFD166' },
+  { type: 'wordmaker'   as const, icon: FileText,    label: 'DocCraft',        color: '#FF3366' },
 ];
 
 export default function Dock() {

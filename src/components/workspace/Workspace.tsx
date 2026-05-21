@@ -11,6 +11,7 @@ const GraphSandbox    = dynamic(() => import('@/components/graph/GraphSandbox'),
 const ProConverter    = dynamic(() => import('@/components/converter/ProConverter'),       { ssr: false });
 const FileCompressor  = dynamic(() => import('@/components/converter/FileCompressor'),    { ssr: false });
 const PdfMaker        = dynamic(() => import('@/components/converter/PdfMaker'),          { ssr: false });
+const WordMaker       = dynamic(() => import('@/components/wordmaker/WordMaker'),         { ssr: false });
 
 const WINDOW_CONTENT: Record<string, React.ComponentType<{}>> = {
   spreadsheet: SpreadsheetGrid,
@@ -18,6 +19,7 @@ const WINDOW_CONTENT: Record<string, React.ComponentType<{}>> = {
   converter:   ProConverter,
   compressor:  FileCompressor,
   pdfmaker:    PdfMaker,
+  wordmaker:   WordMaker,
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -26,13 +28,15 @@ const TYPE_COLOR: Record<string, string> = {
   converter:   '#FF6B6B',
   compressor:  '#FF9A6B',
   pdfmaker:    '#FFD166',
+  wordmaker:   '#FF3366',
 };
 
 function WindowFrame({ win }: { win: any }) {
-  const { id, title, type, x, y, width, height, isOpen, isMinimized } = win;
+  const { id, title, type, x, y, width, height, isOpen, isMinimized, isMaximized } = win;
   const updateWindow = useStore((s) => s.updateWindow);
   const closeWindow = useStore((s) => s.closeWindow);
   const minimizeWindow = useStore((s) => s.minimizeWindow);
+  const maximizeWindow = useStore((s) => s.maximizeWindow);
   const setActiveWindow = useStore((s) => s.setActiveWindow);
   const activeWindowId = useStore((s) => s.activeWindowId);
 
@@ -48,6 +52,7 @@ function WindowFrame({ win }: { win: any }) {
 
   const handleTitleBarMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
+    if (isMaximized) return;
     setActiveWindow(id);
     dragStart.current = { mx: e.clientX, my: e.clientY, ox: pos.x, oy: pos.y };
 
@@ -101,12 +106,13 @@ function WindowFrame({ win }: { win: any }) {
       }`}
       style={{
         position: 'absolute',
-        left: pos.x,
-        top: pos.y,
-        width: isMinimized ? 280 : size.width,
-        height: isMinimized ? 44 : size.height,
-        zIndex: isActive ? 40 : 30,
-        border: isActive ? `1px solid ${color}30` : '1px solid rgba(255,255,255,0.08)',
+        left: isMaximized ? 0 : pos.x,
+        top: isMaximized ? 0 : pos.y,
+        width: isMinimized ? 280 : (isMaximized ? '100vw' : size.width),
+        height: isMinimized ? 44 : (isMaximized ? '100vh' : size.height),
+        zIndex: isMaximized ? (isActive ? 45 : 35) : (isActive ? 40 : 30),
+        border: isMaximized ? 'none' : (isActive ? `1px solid ${color}30` : '1px solid rgba(255,255,255,0.08)'),
+        borderRadius: isMaximized ? 0 : '1rem',
       } as any}
     >
       {/* Title Bar */}
@@ -127,12 +133,7 @@ function WindowFrame({ win }: { win: any }) {
             <Minus size={12} />
           </button>
           <button
-            onClick={() => {
-              const maxW = window.innerWidth - pos.x - 20;
-              const maxH = window.innerHeight - pos.y - 80;
-              setSize({ width: maxW, height: maxH });
-              updateWindow(id, { width: maxW, height: maxH });
-            }}
+            onClick={() => maximizeWindow(id)}
             className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all"
           >
             <Maximize2 size={12} />
@@ -154,7 +155,7 @@ function WindowFrame({ win }: { win: any }) {
       )}
 
       {/* Resize handle */}
-      {!isMinimized && (
+      {!isMinimized && !isMaximized && (
         <div
           onMouseDown={handleResizeMouseDown}
           className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize"
